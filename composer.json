@@ -48,7 +48,7 @@
       "post-update-cmd": [
         "DrupalComposer\\DrupalScaffold\\Plugin::scaffold"
       ],
-      "nuke": "rm -rf docroot/modules/contrib && rm -rf docroot/profiles/contrib/lightning && rm -rf vendor && rm composer.lock"
+      "nuke": "rm -rf modules/contrib && rm -rf profiles/contrib/lightning && rm -rf vendor && rm composer.lock"
     },
     "extra": {
         "installer-types": [
@@ -56,21 +56,21 @@
             "npm-asset"
         ],
         "installer-paths": {
-            "docroot/core": [
+            "core": [
                 "type:drupal-core"
             ],
-            "docroot/libraries/{$name}": [
+            "libraries/{$name}": [
                 "type:drupal-library",
                 "type:bower-asset",
                 "type:npm-asset"
             ],
-            "docroot/modules/contrib/{$name}": [
+            "modules/contrib/{$name}": [
                 "type:drupal-module"
             ],
-            "docroot/profiles/contrib/{$name}": [
+            "profiles/{$name}": [
                 "type:drupal-profile"
             ],
-            "docroot/themes/contrib/{$name}": [
+            "themes/contrib/{$name}": [
                 "type:drupal-theme"
             ],
             "drush/contrib/{$name}": [
