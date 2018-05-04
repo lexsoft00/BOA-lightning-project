@@ -11,10 +11,11 @@ cache:
     - "$HOME/.npm"
 php:
   - 7.0
+  - 7.1
 
 env:
-  - VERSION=LIGHTNING TEST_TAGS=lightning PROFILE_NAME=lightning
-  - VERSION=SUBPROFILE TEST_TAGS=~search PROFILE_NAME=subprofile
+  - TEST_TAGS=lightning PROFILE_NAME=lightning
+  - TEST_TAGS=~search PROFILE_NAME=lightning_extender
 
 addons:
   apt:
@@ -63,55 +64,27 @@ install:
   - phpenv config-add drupal.php.ini
   - phpenv rehash
 
-  # Add Devel, which is a dependency of Lightning Dev, to the codebase
-  - composer require drupal/devel --no-update
-
   # Build the Lightning code base.
   - composer install
 
-  # Create custom sub-profile and download custom tests. We need Lightning to be
-  # installed foe the sub-profile command to run. But we will reinstall later
-  # and run the update.
-  - 'if [ $VERSION = "SUBPROFILE" ]; then
-      cd $TRAVIS_BUILD_DIR/docroot;
-      drush site-install lightning --yes --account-pass=admin --db-url=mysql://lightning:lightning@127.0.0.1/drupal;
-      cd $TRAVIS_BUILD_DIR;
-      composer require drupal/paragraphs;
-      drupal lightning:subprofile --no-interaction --name="Lightning Extender" --machine-name=subprofile --include=paragraphs --exclude=lightning_search;
-      mkdir -p ./tests/features;
-      curl -o tests/features/subprofile.feature  https://gist.githubusercontent.com/balsama/c8c03bb21f7a91a1a87d01ef185a3955/raw;
-      chmod +w ./docroot/sites/default/settings.php;
-    fi;'
-
   # Install Lightning.
-  - cd $TRAVIS_BUILD_DIR/docroot
-  - drush site-install $PROFILE_NAME --yes --account-pass=admin --db-url=mysql://lightning:lightning@127.0.0.1/drupal
-  - drush config-set system.logging error_level all --yes
+  - DB_URL=mysql\://lightning:lightning@127.0.0.1/drupal
+  - HOST=http://127.0.0.1:8080
+  - lightning install $DB_URL lightning $HOST
+  # Reinstall Lightning if we want to run tests on a sub-profile.
+  - [ if $PROFILE_NAME != 'lightning' ]; then lightning install $DB_URL $PROFILE_NAME $HOST; fi
 
-  # Enable the dev module which will perform any manual update steps needed
-  # during database updates.
-  - drush pm-enable lightning_dev --yes
-
-  # Record the version of Lightning for the Configuration Updates.
-  - UPDATE_FROM=$(drupal lightning:version)
-
-  # Update codebase to head and run db updates.
-  - cd $TRAVIS_BUILD_DIR
+  # Update codebase to head.
   - composer nuke
   - composer require acquia/lightning:dev-8.x-3.x --no-update
   - composer update
-  - drupal cache:rebuild all
+  # Run database and Lightning config updates.
+  - drush cache-rebuild
   - drush updatedb --yes
-  - drupal update:lightning $UPDATE_FROM --no-interaction
-
-  # Generate the behat config.
-  - cd $TRAVIS_BUILD_DIR
-  - drupal behat:init http://127.0.0.1:8080 --merge=../docroot/profiles/contrib/lightning/tests/behat.yml
-  - drupal behat:include ../docroot/profiles/contrib/lightning/tests/features --with-subcontexts=../docroot/profiles/contrib/lightning/tests/features/bootstrap --with-subcontexts=../docroot/profiles/contrib/lightning/src/LightningExtension/Context
-  - if [ $VERSION = "SUBPROFILE" ]; then drupal behat:include ../tests/features; fi;
-  - cd $TRAVIS_BUILD_DIR/docroot
+  - drush update:lightning --no-interaction
 
 before_script:
+  - cd docroot
   - drush runserver --default-server=builtin 8080 &>/dev/null &
 
   # Start Selenium and dump its ginormous log into a temporary file.
@@ -119,9 +92,10 @@ before_script:
   - mkdir tmp
   - selenium-server-standalone -port 4444 -log tmp/selenium2.log &
   - sleep 5
+  - cd ..
 
 script:
-  - behat --strict --stop-on-failure --config ./sites/default/files/behat.yml --tags=${TEST_TAGS}
+  - behat --strict --stop-on-failure --config .behat.yml --tags=${TEST_TAGS}
 
 matrix:
   fast_finish: true
